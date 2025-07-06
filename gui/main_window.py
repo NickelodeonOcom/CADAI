@@ -10,12 +10,12 @@ from exporter.file_exporter import export_model
 
 class MainWindow(QMainWindow):
     """
-    The main window of the application, version 2.
-    Features a more advanced layout with a scene graph and improved controls.
+    The main window of the application, version 3.
+    Connects to the new AI parser and procedural geometry engine.
     """
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("CAD AI v2")
+        self.setWindowTitle("CAD AI v3 - Procedural Engine")
         self.setGeometry(100, 100, 1600, 900)
 
         # Main widget and layout
@@ -33,7 +33,10 @@ class MainWindow(QMainWindow):
         self.label.setFont(QFont("Arial", 12))
         self.text_input = QTextEdit()
         self.text_input.setPlaceholderText(
-            "e.g., 'A red cube with side 4 at 0 0 0. A blue sphere with radius 2.5 at 0 0 5.'"
+            "Try advanced shapes!\n\n"
+            "e.g., 'Create a gear with 24 teeth, an inner radius of 4 and an outer radius of 5.'\n\n"
+            "e.g., 'A wooden barrel at 5 0 0.'\n\n"
+            "e.g., 'A red cube with side 4 at -5 0 0.'"
         )
         self.text_input.setMinimumHeight(150)
 
@@ -76,7 +79,7 @@ class MainWindow(QMainWindow):
 
     def add_to_scene(self):
         """
-        Takes user text, parses it, generates geometry, and adds it to the scene.
+        Takes user text, parses it with the AI parser, generates geometry, and adds it to the scene.
         """
         input_text = self.text_input.toPlainText()
         if not input_text:
@@ -87,36 +90,30 @@ class MainWindow(QMainWindow):
             if not commands:
                 raise ValueError("Could not find any valid objects to create.")
             
-            # Generate new meshes and add them to the existing scene assembly
             generate_and_add_to_scene(commands, self.scene_assembly)
             
             self.viewport.display_assembly(self.scene_assembly)
             self.update_scene_list()
             self.export_button.setEnabled(self.scene_assembly.npoints > 0)
-            self.text_input.clear() # Clear input for next command
+            self.text_input.clear()
 
         except ValueError as e:
-            # A simple message box could be implemented here for better UX
             print(f"Error: {e}")
             self.viewport.show_text(f"Error:\n{e}", c='red')
 
     def clear_scene(self):
-        """ Clears the 3D scene and the object list. """
         self.scene_assembly = Assembly()
         self.viewport.display_assembly(self.scene_assembly)
         self.update_scene_list()
         self.export_button.setEnabled(False)
         
     def update_scene_list(self):
-        """ Syncs the QListWidget with the objects in the scene assembly. """
         self.scene_list.clear()
         for i, mesh in enumerate(self.scene_assembly.unpack()):
-            # Use the mesh's name if set, otherwise create a generic one
             name = mesh.name if mesh.name else f"Object_{i+1}"
             self.scene_list.addItem(name)
 
     def export_scene(self):
-        """ Exports the entire scene assembly to a file. """
         if not self.scene_assembly.unpack():
             return
 
@@ -124,5 +121,4 @@ class MainWindow(QMainWindow):
             self, "Export Scene", "", "STL Files (*.stl);;OBJ Files (*.obj);;VTK Files (*.vtk);;All Files (*)"
         )
         if file_path:
-            # The exporter can handle assemblies directly
             export_model(self.scene_assembly, file_path)

@@ -1,75 +1,92 @@
 import re
+from g4f.client import Client
+
+def _extract_param(text, name):
+    """Helper to find a numeric value after a keyword."""
+    for keyword in keywords:
+        match = re.search(f'{keyword}\\s+of\\s+{pattern}', text) or \
+                re.search(f'{keyword}\\s+{pattern}', text)
+        if match:
+            return float(match.group(1))
+    return None
+
+    client = Client()
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": f"In this text, {text}, related to this name,{name}, give me the number of {name} written in the text, like if I were to say radius of 5, return just 5. return just the number, it could be an int or a decimal"}],
+        web_search=False
+    )
+    return response.choices[0].message.content
 
 def parse_command(text: str) -> list[dict]:
     """
-    An advanced, rule-based parser to extract multiple commands from natural language.
-    It identifies shapes, colors, sizes, positions, and rotations.
-    
-    Args:
-        text (str): The user's input string.
-        
-    Returns:
-        list[dict]: A list of structured command dictionaries.
+    AI-like parser. It first identifies the primary intent (what shape to build)
+    and then extracts parameters relevant to that shape.
     """
     commands = []
-    # Split text into sentences or phrases that might contain an object description.
-    # This regex splits by periods, "and a", "and then a", etc., while keeping delimiters.
-    sentences = re.split(r'(\.|\s+and a\s+|\s+and then a\s+)', text, flags=re.IGNORECASE)
+    text = text.lower().strip()
     
-    # Re-join sentences to handle splits correctly
-    full_sentences = []
-    temp_sentence = ""
-    for s in sentences:
-        temp_sentence += s
-        if re.match(r'(\.|\s+and a\s+|\s+and then a\s+)', s):
-            full_sentences.append(temp_sentence)
-            temp_sentence = ""
-    if temp_sentence:
-        full_sentences.append(temp_sentence)
-
-    for sentence in full_sentences:
-        sentence = sentence.lower().strip()
-        if not sentence:
-            continue
-
-        # --- Identify Shape ---
-        shape_match = re.search(r'\b(cube|sphere|cylinder)\b', sentence)
-        if not shape_match:
-            continue
+    # --- Intent Recognition Stage ---
+    # A real AI would use a classification model here. We simulate it.
+    client = Client()
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": f"Based on this prompt,{text}, determine what shape the user is talking about. return just the shape, nothing else"}],
+        web_search=False
+    )
+    shape = response.choices[0].message.content
+    else:
+        # If no primary intent is found, we can't proceed.
+        raise ValueError("I don't know how to make that shape yet.")
         
-        shape = shape_match.group(1)
-        command = {'shape': shape, 'params': {}, 'name': sentence}
+    command = {'shape': shape, 'params': {}, 'name': text}
 
-        # --- Identify Parameters based on Shape ---
-        if shape == 'cube':
-            side_match = re.search(r'(side|size)\s+of\s+(\d+\.?\d*)', sentence) or \
-                         re.search(r'(side|size)\s+(\d+\.?\d*)', sentence)
-            if side_match:
-                command['params']['side'] = float(side_match.group(2))
+    # --- Entity Extraction Stage ---
+    # A real AI uses Named Entity Recognition (NER). We simulate it by
+    # extracting params based on the identified intent
+    return response.choices[0].message.content
+    client = Client()
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": f"based on this shape, {shape}, return the parameters it needs, like radius, height etc. return just the parameters in the format of parameter1 parameter2 parameter3 etc"}],
+        web_search=False
+    )
+    var = response.choices[0].message.content.split()
+    
+    for i in range(len(var)):
         
-        elif shape == 'sphere':
-            radius_match = re.search(r'radius\s+of\s+(\d+\.?\d*)', sentence) or \
-                           re.search(r'radius\s+(\d+\.?\d*)', sentence)
-            if radius_match:
-                command['params']['radius'] = float(radius_match.group(2))
+        command['params'][i] = _extract_params(text, var[i])
+    '''
+    if shape == 'gear':
+        command['params']['teeth'] = _extract_param(text, ['teeth', 'cogs'])
+        command['params']['inner_radius'] = _extract_param(text, ['inner radius', 'irad'])
+        command['params']['outer_radius'] = _extract_param(text, ['outer radius', 'orad', 'radius'])
+        command['params']['height'] = _extract_param(text, ['height', 'width'])
+    
+    elif shape == 'barrel':
+        command['params']['radius'] = _extract_param(text, ['radius'])
+        command['params']['height'] = _extract_param(text, ['height'])
+        command['params']['bulge'] = _extract_param(text, ['bulge', 'bulge factor'])
 
-        elif shape == 'cylinder':
-            radius_match = re.search(r'radius\s+(\d+\.?\d*)', sentence)
-            height_match = re.search(r'height\s+(\d+\.?\d*)', sentence)
-            if radius_match:
-                command['params']['radius'] = float(radius_match.group(1))
-            if height_match:
-                command['params']['height'] = float(height_match.group(1))
+    elif shape == 'cube':
+        command['params']['side'] = _extract_param(text, ['side', 'size'])
 
-        # --- Identify Common Attributes (Color, Position, Rotation) ---
-        color_match = re.search(r'\b(red|green|blue|yellow|orange|purple|white|black|gray)\b', sentence)
-        if color_match:
-            command['params']['color'] = color_match.group(1)
+    elif shape == 'sphere':
+        command['params']['radius'] = _extract_param(text, ['radius'])
 
-        pos_match = re.search(r'at\s+(position\s+)?(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)', sentence)
-        if pos_match:
-            command['params']['position'] = [float(pos_match.group(2)), float(pos_match.group(3)), float(pos_match.group(4))]
-        
-        commands.append(command)
-        
+    elif shape == 'cylinder':
+        command['params']['radius'] = _extract_param(text, ['radius'])
+        command['params']['height'] = _extract_param(text, ['height'])
+    '''
+
+    # --- General Parameter Extraction (Position, Color) ---
+    color_match = re.search(r'\b(red|green|blue|yellow|orange|purple|white|black|gray|brown|wooden)\b', text)
+    if color_match:
+        command['params']['color'] = color_match.group(1)
+
+    pos_match = re.search(r'at\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)', text)
+    if pos_match:
+        command['params']['position'] = [float(pos_match.group(1)), float(pos_match.group(2)), float(pos_match.group(3))]
+    
+    commands.append(command)
     return commands
